@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ridgeline Rescue — STOL Mountain Rescue</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1428; font-family: "Segoe UI", system-ui, sans-serif; }
+  #wrap { position: fixed; inset: 0; }
+  #game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; background: #2b2350; }
+  #status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  /* Top HUD bar: instruments that stay lit and readable. */
+  #hud { position: absolute; top: 0; left: 0; right: 0; display: flex; gap: 10px; align-items: stretch; padding: 8px 12px; background: rgba(23, 18, 38, 0.88); color: #f2ead8; z-index: 3; }
+  .gauge { background: #241d38; border: 1px solid #4a3f63; border-radius: 8px; padding: 4px 12px; min-width: 92px; }
+  .gauge .lbl { font-size: 10px; letter-spacing: 2px; color: #b9aed6; }
+  .gauge .val { font-size: 22px; font-weight: 700; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums; }
+  .gauge .val small { font-size: 12px; color: #b9aed6; font-weight: 400; }
+  .bar-gauge { flex: 1; min-width: 120px; }
+  .bar { height: 10px; background: #0f0b1c; border-radius: 5px; margin-top: 5px; overflow: hidden; }
+  .bar > div { height: 100%; background: #ffb02e; transition: width 0.2s; }
+  .bar > div.low { background: #ff5a3c; }
+  .bar > div.bad { background: #ff2e2e; }
+  #hud-dmg-bar { background: #ff5a3c; }
+  #hud-mission { flex: 1.4; display: flex; align-items: center; font-weight: 700; font-size: 15px; color: #ffcc33; letter-spacing: 0.5px; }
+  #hud-score-box { text-align: right; }
+  #hud-message { position: absolute; left: 50%; top: 64px; transform: translateX(-50%); background: rgba(23, 18, 38, 0.85); color: #ffe9a8; border: 1px solid #ff8c28; border-radius: 8px; padding: 8px 18px; font-size: 16px; font-weight: 600; opacity: 0; pointer-events: none; white-space: nowrap; z-index: 4; }
+  #hud-message.visible { opacity: 1; }
+
+  /* Bottom instrument strip. */
+  #panel { position: absolute; bottom: 0; left: 0; right: 0; display: flex; gap: 10px; align-items: center; padding: 6px 12px; background: rgba(23, 18, 38, 0.88); color: #cfc8e8; font-size: 13px; z-index: 3; }
+  #panel b { color: #fff; }
+  #panel .spacer { flex: 1; }
+  #panel kbd { background: #2c2547; border: 1px solid #5a4f80; border-radius: 4px; padding: 1px 6px; font-size: 11px; color: #ffe9a8; }
+
+  /* Overlay screens: title, pause, crash, win. */
+  #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: rgba(18, 12, 34, 0.62); color: #f7f2e7; z-index: 5; }
+  #overlay.hidden { display: none; }
+  #overlay-title { font-size: 54px; font-weight: 800; letter-spacing: 4px; color: #ffcc33; text-shadow: 0 3px 0 #7a2d12, 0 8px 24px rgba(0,0,0,0.6); margin: 0 0 14px; }
+  #overlay-body { font-size: 18px; line-height: 1.6; max-width: 640px; }
+  #overlay-body b { color: #ffb02e; }
+  #overlay-hint { margin-top: 22px; font-size: 15px; color: #ffe9a8; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">
+    <div class="gauge"><div class="lbl">ALTITUDE</div><div class="val" id="hud-alt">0 m</div></div>
+    <div class="gauge"><div class="lbl">AIRSPEED</div><div class="val" id="hud-spd">0 km/h</div></div>
+    <div class="gauge"><div class="lbl">HEADING</div><div class="val" id="hud-hdg">090°</div></div>
+    <div class="gauge bar-gauge"><div class="lbl">FUEL <span id="hud-fuel-text">100%</span></div><div class="bar"><div id="hud-fuel-bar" style="width:100%"></div></div></div>
+    <div class="gauge bar-gauge"><div class="lbl">DAMAGE <span id="hud-dmg-text">0%</span></div><div class="bar"><div id="hud-dmg-bar" style="width:0%"></div></div></div>
+    <div id="hud-mission">MISSION 1 · RINGS 0/5</div>
+    <div class="gauge" id="hud-score-box"><div class="lbl">SCORE</div><div class="val" id="hud-score">0</div></div>
+  </div>
+  <canvas id="game" width="1280" height="800" aria-label="Ridgeline Rescue: fly a STOL bush plane through rings, drop supplies, and land on a mountain strip"></canvas>
+  <div id="panel">
+    <span>CRATES <b id="hud-crates">▣ 3 · ✓ 0/3</b></span>
+    <span>TIME <b id="hud-timer">00:00</b></span>
+    <span>WIND <b id="hud-wind">→ 0.0 m/s</b></span>
+    <span class="spacer"></span>
+    <span><kbd>↑/W</kbd> throttle <kbd>↓/S</kbd> throttle down <kbd>←/→</kbd> pitch <kbd>SPACE</kbd> drop crate <kbd>C</kbd> cockpit <kbd>M</kbd> sound</span>
+  </div>
+</div>
+<div id="hud-message"></div>
+<div id="overlay">
+  <h1 id="overlay-title">RIDGELINE RESCUE</h1>
+  <div id="overlay-body"></div>
+  <div id="overlay-hint"></div>
+</div>
+<p id="status" role="status" aria-live="polite"></p>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
